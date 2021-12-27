@@ -47,7 +47,7 @@ def wrapper():
     for strength in strengths:
         pw_cnt_dict = strength_cnt_dict[strength]
         sub_total = sum(pw_cnt_dict.values())
-        print(f"{strength:7}: uniq {len(pw_cnt_dict):8}, total {sub_total:8}, {sub_total / total:7.4%}",
+        print(f"{strength:7}: uniq {len(pw_cnt_dict):8}, total {sub_total:8}, {sub_total / total:9.4%}",
               file=sys.stderr, flush=True)
     if args.save is not None:
         with open(args.save, 'w') as f_save:
