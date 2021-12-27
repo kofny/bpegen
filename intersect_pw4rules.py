@@ -5,6 +5,7 @@ We intersect passwords following several rules into a new file
 import argparse
 import json
 import os.path
+import sys
 from typing import List
 
 
@@ -13,6 +14,7 @@ def intersect(folder: str, rules: List[int]):
     universe = {}
     for rule_id, rules_file in sorted(rules_files.items(), key=lambda x: os.path.getsize(x[1])):
         join = {}
+        print(f"Parsing rule {rule_id}...", end=" ", file=sys.stderr)
         with open(rules_file, 'r') as f_rules_file:
             for line in f_rules_file:
                 line = line.strip('\r\n')
@@ -21,6 +23,8 @@ def intersect(folder: str, rules: List[int]):
                 if len(universe) == 0 or pw in universe:
                     join[pw] = info
                 pass
+        print(f"{len(join)} passwords, Done!", file=sys.stderr)
+        del universe
         universe = join
     return universe.values()
 
