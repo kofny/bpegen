@@ -14,16 +14,19 @@ def intersect(folder: str, rules: List[int]):
     universe = {}
     for rule_id, rules_file in sorted(rules_files.items(), key=lambda x: os.path.getsize(x[1])):
         join = {}
-        print(f"Parsing rule {rule_id}...", end=" ", file=sys.stderr)
         with open(rules_file, 'r') as f_rules_file:
+            idx = 0
             for line in f_rules_file:
                 line = line.strip('\r\n')
                 info = json.loads(line)
                 pw = info['pw']
                 if len(universe) == 0 or pw in universe:
                     join[pw] = info
+                idx += 1
+                if idx % 10000 == 0:
+                    print(f"Rule {rule_id}: {len(join):10} passwords", end='\r', file=sys.stderr, flush=True)
                 pass
-        print(f"{len(join)} passwords, Done!", file=sys.stderr)
+        print(f"Rule {rule_id}: {len(join):10} passwords, Done!", file=sys.stderr, flush=True)
         del universe
         universe = join
     return universe.values()
