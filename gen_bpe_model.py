@@ -17,6 +17,12 @@ def check_path_exists(_path: str):
     pass
 
 
+def lets_log(d: Dict[Any, float]):
+    for k in d:
+        d[k] = -math.log2(d[k])
+    pass
+
+
 def read_tag(tag_path: str, tag: str) -> Dict[Tuple[str, int], Dict[str, float]]:
     check_path_exists(tag_path)
     tag_dict = defaultdict(lambda: defaultdict(float))
@@ -25,9 +31,9 @@ def read_tag(tag_path: str, tag: str) -> Dict[Tuple[str, int], Dict[str, float]]
             dot_idx = file.find(".")
             tag_len = (tag, int(file[:dot_idx]))
             fd = open(os.path.join(root, file))
-            for _line in fd:
-                _tag, prob = _line.strip("\r\n").split("\t")
-                tag_dict[tag_len][_tag] = -math.log2(float(prob))
+            for line in fd:
+                _tag, prob = line.strip("\r\n").split("\t")
+                tag_dict[tag_len][_tag] = float(prob)
             fd.close()
     return tag_dict
 
@@ -38,12 +44,12 @@ def read_grammars(gram_path: str):
     re_tag_len = re.compile(r"([A-Z]+[0-9]+)")
     re_tag = re.compile(r"[A-Z]+")
     re_len = re.compile(r"[0-9]+")
-    for _line in fd:
-        raw_structure, prob = _line.strip("\r\n").split("\t")
+    for line in fd:
+        raw_structure, prob = line.strip("\r\n").split("\t")
         structure = tuple(
             [(re_tag.search(t).group(), int(re_len.search(t).group())) for t in re_tag_len.split(raw_structure) if
              len(t) > 0])
-        structure_prob_dict[structure] = -math.log2(float(prob))
+        structure_prob_dict[structure] = float(prob)
 
     fd.close()
     return structure_prob_dict
@@ -51,7 +57,6 @@ def read_grammars(gram_path: str):
 
 def read_bpe(model_path: str) -> Tuple[Dict[Any, float], Dict[Tuple[str, int], Dict[Any, float]]]:
     """
-
     param model_path:
     return: (grammars, terminals)
         the grammars is a dict of structures and corresponding probabilities, such as
@@ -60,7 +65,7 @@ def read_bpe(model_path: str) -> Tuple[Dict[Any, float], Dict[Tuple[str, int], D
         and probabilities, such as (D, 10): {1234567890, 1.556e-7}
     """
     check_path_exists(model_path)
-    _grammars = read_grammars(os.path.join(model_path, "grammar", "structures.txt"))
+    grammars = read_grammars(os.path.join(model_path, "grammar", "structures.txt"))
     _dicts = []
     lower = read_tag(os.path.join(model_path, "lower"), "L")
     upper = read_tag(os.path.join(model_path, "upper"), "U")
@@ -69,8 +74,8 @@ def read_bpe(model_path: str) -> Tuple[Dict[Any, float], Dict[Tuple[str, int], D
     four_m = read_tag(os.path.join(model_path, "mixed_4"), "FM")
     digits = read_tag(os.path.join(model_path, "digits"), "D")
     special = read_tag(os.path.join(model_path, "special"), "S")
-    _terminals = {**lower, **upper, **double_m, **triple_m, **four_m, **digits, **special}
-    return _grammars, _terminals
+    terminals = {**lower, **upper, **double_m, **triple_m, **four_m, **digits, **special}
+    return grammars, terminals
 
 
 def count_l_u_d_s(structures: Dict[Tuple, float]) -> (Dict[Any, Set], Dict[str, set]):
@@ -138,7 +143,11 @@ def expand_2d(two_d_dict: Dict[Any, Dict[Any, float]], minus_log_based: bool = F
     for k, items in two_d_dict.items():
         if len(items) == 0:
             continue
-        new_two_d_dict[k] = expand_1d(items, minus_log_based=minus_log_based)
+        try:
+            new_two_d_dict[k] = expand_1d(items, minus_log_based=minus_log_based)
+        except ValueError:
+            print(items)
+            sys.exit(-1)
     return new_two_d_dict
 
 
@@ -198,12 +207,29 @@ class BpePcfgSim(object):
 
 def model2bin(model_path, dangerous_path, num_samples,
               model_pickle, intermediate_pickle, dangerous_chunks_pickle, samples_pickle):
+    print("Loading model...", end='', file=sys.stderr)
+    # count_luds and BpePcfgSim will log the prob
+    # Therefore we do not log the prob here
     grammars, terminals = read_bpe(model_path)
+    print("done!\n"
+          "Loading chunks...", end='', file=sys.stderr)
     with open(dangerous_path, 'r') as f_danger:
         chunks = set(line.strip("\r\n") for line in f_danger)
+    print("done!\n"
+          "Counting intermediate results...", end='', file=sys.stderr)
     converted, not_parsed = count_l_u_d_s(grammars)
+    print("done!\n"
+          "Sampling probabilities...", end='', file=sys.stderr)
     bpe_simulator = BpePcfgSim(grammars, terminals)
     samples = [bpe_simulator.sample1() for _ in range(num_samples)]
+    # Before saving, we log the grammars and terminals
+    for k in grammars:
+        grammars[k] = -math.log2(grammars[k])
+    for _, v in terminals.items():
+        for k in v:
+            v[k] = -math.log2(v[k])
+    print("done!", file=sys.stderr)
+
     with open(model_pickle, 'wb') as f_model_pickle, \
             open(intermediate_pickle, 'wb') as f_inter_pickle, \
             open(dangerous_chunks_pickle, 'wb') as f_danger_pickle, \
@@ -223,14 +249,21 @@ def wrapper():
     cli.add_argument('-s', '--save-in-folder', required=True, help='Pickle files will be saved in this folder')
     args = cli.parse_args()
     folder = args.save_in_folder
+    if not os.path.exists(folder):
+        os.mkdir(folder)
 
     def gen_path(x: str):
         return os.path.join(folder, x)
 
     model_pickle, inter_pickle, danger_pickle, samples_pickle = \
-        gen_path('bpepcfgmodel.pickle'), gen_path('intermediate_results.pickle'), \
-        gen_path('dangerous_chunks.pickle'), gen_path('samples.pickle')
+        gen_path('bpemodel.pickle'), gen_path('intermediate_results.pickle'), \
+        gen_path('dangerous_chunks.pickle'), gen_path('monte_carlo_sample.pickle')
     model2bin(model_path=args.model, dangerous_path=args.danger, num_samples=args.num_samples,
               model_pickle=model_pickle, intermediate_pickle=inter_pickle,
               dangerous_chunks_pickle=danger_pickle, samples_pickle=samples_pickle)
+    pass
+
+
+if __name__ == '__main__':
+    wrapper()
     pass
