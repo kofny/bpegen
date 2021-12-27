@@ -6,30 +6,35 @@ import argparse
 import json
 import os.path
 import sys
+from collections import defaultdict
 from typing import List
 
 
 def intersect(folder: str, rules: List[int]):
     rules_files = {rule_id: os.path.join(folder, f"rule-{rule_id}.txt") for rule_id in rules}
-    universe = {}
-    for rule_id, rules_file in sorted(rules_files.items(), key=lambda x: os.path.getsize(x[1])):
-        join = {}
+    universe = defaultdict(int)
+    files = sorted(rules_files.items(), key=lambda x: os.path.getsize(x[1]))
+    for rule_id, rules_file in files:
         with open(rules_file, 'r') as f_rules_file:
             idx = 0
             for line in f_rules_file:
                 line = line.strip('\r\n')
                 info = json.loads(line)
                 pw = info['pw']
-                if len(universe) == 0 or pw in universe:
-                    join[pw] = info
+                universe[pw] += 1
                 idx += 1
                 if idx % 10000 == 0:
-                    print(f"Rule {rule_id}: {len(join):10} passwords", end='\r', file=sys.stderr, flush=True)
+                    print(f"Rule {rule_id}: parsed {idx:10} passwords", end='\r', file=sys.stderr, flush=True)
                 pass
-        print(f"Rule {rule_id}: {len(join):10} passwords, Done!", file=sys.stderr, flush=True)
-        del universe
-        universe = join
-    return universe.values()
+        print(f"Rule {rule_id}: Done!                                 ", file=sys.stderr, flush=True)
+    with open(files[0][1], 'r') as f_files0:
+        for line in f_files0:
+            line = line.strip("\r\n")
+            info = json.loads(line)
+            pw = info['pw']
+            if universe.get(pw, 0) == len(rules):
+                yield info
+    pass
 
 
 def wrapper():
