@@ -39,10 +39,11 @@ def intersect(folder: str, rules: List[int]):
 
 def wrapper():
     cli = argparse.ArgumentParser("Intersecting passwords following various rules")
-    cli.add_argument('-f', "--folder", type=str, help='folder containing passwords following various rules')
-    cli.add_argument("-r", '--rule-ids', type=int, choices=[1, 2, 3, 4, 5, 6, 7], nargs='+',
+    cli.add_argument('-f', "--folder", required=True, type=str,
+                     help='folder containing passwords following various rules')
+    cli.add_argument("-r", '--rule-ids', required=True, type=int, choices=[1, 2, 3, 4, 5, 6, 7], nargs='+',
                      help='rule ids to intersect')
-    cli.add_argument("-s", "--save", type=str, help='save intersected passwords in this file')
+    cli.add_argument("-s", "--save", required=True, type=str, help='save intersected passwords in this file')
     args = cli.parse_args()
     results = intersect(folder=args.folder, rules=args.rule_ids)
     with open(args.save, 'w') as f_save:
