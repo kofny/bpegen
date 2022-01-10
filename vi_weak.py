@@ -32,15 +32,20 @@ def wrapper():
     cli.add_argument('--intervals', type=float, nargs='+',
                      default=[1, 10 ** 6, 10 ** 6, 10 ** 14, 10 ** 14, 10 ** 99],
                      help='the intervals for different strengths')
+    cli.add_argument('-s', "--save", type=str, default='stderr', help='save results')
     args = cli.parse_args()
     strengths, intervals = args.strengths, args.intervals
     strength_dict = {strengths[i]: (intervals[2 * i], intervals[2 * i + 1]) for i in range(len(strengths))}
     files = args.pw_files
+    if args.save != 'stderr':
+        f_save = open(args.save, 'w')
+    else:
+        f_save = sys.stderr
     for file in files:
         results = read_pw(file, strength_dict)
         strength_cnt_dict: Dict[str, Dict[str, int]] = {strength: {} for strength in strength_dict.keys()}
         total = 0
-        print(f"File: {file}", file=sys.stderr, flush=True)
+        print(f"File: {file}", file=f_save, flush=True)
         for pw, cnt, gn, st in results:
             strength_cnt_dict[st][pw] = cnt
             total += cnt
@@ -48,10 +53,10 @@ def wrapper():
             pw_cnt_dict = strength_cnt_dict[strength]
             sub_total = sum(pw_cnt_dict.values())
             i_l, i_r = strength_dict[strength]
-            print(f"[{i_l:7.1e}, {i_r:7.1e}]{strength:>7}: "
-                  f"uniq {len(pw_cnt_dict):8}, total {sub_total:8}, {sub_total / total:9.4%}",
-                  file=sys.stderr, flush=True)
-        print()
+            msg = f"[{i_l:7.1e}, {i_r:7.1e}]{strength:>7}: " \
+                  f"uniq {len(pw_cnt_dict):8}, total {sub_total:8}, {sub_total / total:9.4%}"
+            print(msg, file=f_save, flush=True)
+        f_save.close()
 
 
 if __name__ == '__main__':
