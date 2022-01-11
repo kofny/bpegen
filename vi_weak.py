@@ -56,7 +56,7 @@ def wrapper():
             msg = f"[{i_l:7.1e}, {i_r:7.1e}]{strength:>7}: " \
                   f"uniq {len(pw_cnt_dict):8}, total {sub_total:8}, {sub_total / total:9.4%}"
             print(msg, file=f_save, flush=True)
-        f_save.close()
+    f_save.close()
 
 
 if __name__ == '__main__':
